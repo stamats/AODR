@@ -115,22 +115,22 @@ Plot der Similarity: Erkennen/Identifizieren von Ausreißern
 Anstieg der Ähnlichkeit durch Vorverarbeitung
 
 ```{r}
-corPlot(cor.mas5, minCor = 0.75)
-corPlot(cor.rma, minCor = 0.85)
-corPlot(cor.vsnrma, minCor = 0.80)
-corPlot(cor.gcrma, minCor = 0.85)
-corPlot(cor.plier, minCor = 0.50)
+corPlot(cor.mas5, minCor = 0.75, labels = pData(Daten)[,1], title = "MAS 5.0")
+corPlot(cor.rma, minCor = 0.85, labels = pData(Daten)[,1], title = "RMA")
+corPlot(cor.vsnrma, minCor = 0.80, labels = pData(Daten)[,1], title = "VSN-RMA")
+corPlot(cor.gcrma, minCor = 0.85, labels = pData(Daten)[,1], title = "GC-RMA")
+corPlot(cor.plier, minCor = 0.50, labels = pData(Daten)[,1], title = "PLIER")
 ```
 
 Mean-Sd-Plot und Ähnlichkeitsplots sprechen tendenziell für RMA Verfahren.
 
 ```{r}
 ## range = 0: whiskers bis zu den extremesten Datenpunkten
-boxplot(log2(exprs(Daten.mas5)), range = 0)
-boxplot(exprs(Daten.rma), range = 0)
-boxplot(exprs(Daten.gcrma), range = 0)
-boxplot(exprs(Daten.vsnrma), range = 0)
-boxplot(exprs(Daten.plier), range = 0)
+boxplot(log2(exprs(Daten.mas5)), range = 0, main = "MAS 5.0")
+boxplot(exprs(Daten.rma), range = 0, main = "RMA")
+boxplot(exprs(Daten.gcrma), range = 0, main = "GC-RMA")
+boxplot(exprs(Daten.vsnrma), range = 0, main = "VSN-RMA")
+boxplot(exprs(Daten.plier), range = 0, main = "PLIER")
 ```
 
 Box- und Whisker-Plots sprechen für RMA und VSN-RMA.
@@ -183,9 +183,9 @@ Similarity der Arrays.
 cor.rma <- cor(RMA.fi)
 cor.gcrma <- cor(GCRMA.fi)
 cor.vsnrma <- cor(VSNRMA.fi)
-corPlot(cor.rma, minCor = 0.7)
-corPlot(cor.gcrma, minCor = 0.78)
-corPlot(cor.vsnrma, minCor = 0.78)
+corPlot(cor.rma, minCor = 0.7, labels = pData(Daten)[,1], title = "RMA")
+corPlot(cor.gcrma, minCor = 0.78, labels = pData(Daten)[,1], title = "GC-RMA")
+corPlot(cor.vsnrma, minCor = 0.78, labels = pData(Daten)[,1], title = "VSN-RMA")
 ```
 
 Entscheidung für RMA, da mean-SD-Plot am homogensten wirkt.
@@ -274,17 +274,45 @@ res <- mod.t.test(x = RMA.fi, group = group)
 colSums(res[,c(5,6)] < 0.05)
 ```
 
-Erzeuge Heatmaps der Ergebnisse. Aufgrund der vielen signifikanten Unterschiede 
-hier nicht.
-
 Vulkanplot für die Ergebnisse des moderierten t-Tests.
 
 ```{r}
 library(MKinfer)
 volcano(res$`difference in means`, pval = res$adj.p.value, 
         effect0 = 0, effect.low = -1, effect.high = 1, 
-        alpha = 0.25, ylab = "-log10(adj.p.value)", 
-        xlab = "log-fache Veränderung")
+        alpha = 0.25, xlab = "log2-fache Veränderung (log2-FC)",
+        ylab = expression(paste(-log[10], "(adj. p Wert)")))
+```
+
+Erzeuge Heatmaps der Ergebnisse. 
+
+```{r}
+library(ComplexHeatmap)
+library(circlize)
+library(RColorBrewer)
+## Auswahl der Daten
+sel <- res$adj.p.value < 0.05 & abs(res$`difference in means`) > 1
+selData <- RMA.fi[sel,]
+selData <- selData - rowMeans(selData, na.rm = TRUE)
+colnames(selData) <- as.character(group)
+## Festlegen der Farben
+col1 <- rev(brewer.pal(n = 8, name = "RdYlBu"))
+col2 <- brewer.pal(n = 3, name = "Set1")[c(3,1)]
+mycol <- colorRamp2(seq(-2, 2, length = 128), colorRampPalette(col1)(128))
+## Annotation
+df <- data.frame(Gruppe = group)
+ha <- HeatmapAnnotation(df = df,
+                        col = list(Gruppe = c("A1" = col2[1],
+                                              "A2" = col2[2])))
+## Zeichnen der Heatmap
+Heatmap(selData, col = mycol, name = "log2-FC", show_row_names = FALSE,
+        top_annotation = ha, show_column_names = TRUE,
+        column_names_gp = gpar(fontsize = 8),
+        clustering_distance_columns = "pearson",
+        show_row_dend = FALSE, km = 8,
+        cluster_columns = TRUE, show_column_dend = TRUE,
+        column_title = "Adj. p Wert < 0.05 und |log2-FC| > 1",
+        show_heatmap_legend = TRUE)
 ```
 
 Bei mehr Gruppen, könnte man z.B. ein Venndiagramm zum Vergleich der 
