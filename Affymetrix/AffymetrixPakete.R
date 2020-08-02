@@ -24,6 +24,9 @@ if(!require("RobLoxBioC", quietly = TRUE))
 if(!require("plier", quietly = TRUE))
   install("plier", update = FALSE)
 
+if(!require("genefilter", quietly = TRUE))
+  install("genefilter", update = FALSE)
+
 if(!require("MKomics", quietly = TRUE))
   install.packages("MKomics")
 
