@@ -1,5 +1,2 @@
-## Benötigte Pakete für die Analyse der 
-## Metabolomics Daten
-library(BiocManager)
+## Benötigte Pakete für die Analyse der Metabolomics Daten
 install.packages("Amelia")
-install("ComplexHeatmap")
