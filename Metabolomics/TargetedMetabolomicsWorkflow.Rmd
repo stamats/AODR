@@ -1,7 +1,7 @@
 ---
 title: "Targeted Metabolomics Workflow"
 author: "M. Kohl"
-date: "März 2018"
+date: "März 2021"
 output:
   rmarkdown::html_document:
     toc: true
@@ -9,6 +9,7 @@ output:
     theme: united
     highlight: tango
 ---
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, error = TRUE)
 ```
@@ -17,37 +18,44 @@ knitr::opts_chunk$set(echo = TRUE, error = TRUE)
 
 Beschreibung des Experimentes, des Datensatzes, der Hypothesen, etc.
 
+
 # Einlesen der Daten
 
 Es handelt sich um targeted Metabolomics Daten aus einem Mausexperiment.
 Die Daten des kompletten Experiments wurden bereits eingelesen und in einer
 RData-Datei abgespeichert. 
+
 ```{r}
 load("rawData.RData")
 ```
 
 Wir sortieren die Daten nach der Behandlung und der Sample ID.
+
 ```{r}
 rawData <- rawData[order(rawData$Gruppe, rawData$'Sample Identification'),]
 str(rawData)
 ```
 
 Es liegen Daten von den folgenden Tieren vor.
+
 ```{r}
 rawData[,1:5]
 ```
 
 Wir extrahieren die Spalten mit den Konzentrationen und die Spalten zum Status
 der Messungen.
+
 ```{r}
 concData <- rawData[,seq(from = 8, to = 382, by = 2)]
 statusData <- rawData[,seq(from = 9, to = 383, by = 2)]
 colnames(statusData) <- colnames(concData)
 ```
 
+
 # Qualitätskontrolle der Rohdaten
 
 Zunächst einmal werfen wir einen Blick auf die fehlenden Daten.
+
 ```{r, fig.width=10}
 library(Amelia)
 missmap(concData, rank.order = FALSE, y.labels = rawData[,1], 
@@ -56,6 +64,7 @@ missmap(concData, rank.order = FALSE, y.labels = rawData[,1],
 
 Wir sehen nur sehr vereinzelt fehlende Werte. Wir wiederholen den Plot mit den
 Spalten, die fehlende Werte enthalten.
+
 ```{r}
 NAcols <- colSums(is.na(concData)) > 0
 missmap(concData[,NAcols], rank.order = FALSE, y.labels = rawData[,1])
@@ -86,7 +95,7 @@ gemessen wurden. Wir betrachten abschließend die Ähnlichkeit zwischen den
 Samples mit Hilfe der Spearman Korrelation.
 
 ```{r}
-library(MKmisc)
+library(MKomics)
 Cor <- cor(t(concData), method = "spearman",
            use = "pairwise.complete.obs")
 corPlot(Cor, minCor = 0.95, labels = paste(rawData$Gruppe, rawData[,1]),
@@ -94,12 +103,15 @@ corPlot(Cor, minCor = 0.95, labels = paste(rawData$Gruppe, rawData[,1]),
 ```
 
 Es lassen sich zum Teil die experimentellen Gruppen erkennen. Insbesondere sieht
-man eine sehr hohe Ähnlichkeit zwischen den technischen Duplikaten. Die Maus 3 zeichnet sich als leichter Ausreißer ab.
+man eine sehr hohe Ähnlichkeit zwischen den technischen Duplikaten. 
+Die Maus 3 zeichnet sich als leichter Ausreißer ab.
 
-#Vorverarbeitung der Rohdaten
+
+# Vorverarbeitung der Rohdaten
 
 Wir verwenden den Logarithmus als normalisierende und varianzstabilisierende
 Transformation.
+
 ```{r}
 logData <- log2(concData)
 logData[logData == -Inf] <- NA
@@ -107,6 +119,7 @@ logData[logData == -Inf] <- NA
 
 Wir vergleichen die technischen Replikate, indem wir die logFC zwischen den
 Duplikaten berechnen.
+
 ```{r}
 logFC.dupl <- logData[-11,][seq(1,17,by=2),]-logData[-11,][seq(2,18,by=2),]
 boxplot(logFC.dupl, las = 2, main = "log-FC between technical duplicates",
@@ -120,6 +133,7 @@ legend("topleft", fill = c("darkgreen", "darkred"),
 Für die meisten Metaboliten liegen die Unterschiede unter 10\%.
 Wir wiederholen den Plot, wobei wir nun nur Metaboliten darstellen, die in 
 wenigstens 25\% der Fälle mehr als 20\% Unterschied zeigen.
+
 ```{r}
 Qs <- apply(logFC.dupl, 2, quantile, probs = c(0.25, 0.75), na.rm = TRUE)
 ausw.var <- Qs[1,] < -log2(1.2) | Qs[2,] > log2(1.2)
@@ -132,6 +146,7 @@ legend("topleft", fill = c("darkgreen", "darkred"),
 ```
 
 Wir mitteln die technischen Duplikate.
+
 ```{r}
 normData <- 0.5*logData[-11,][seq(1,17,by=2),]+0.5*logData[-11,][seq(2,18,by=2),]
 normData <- rbind(normData[1:5,], logData[11,], normData[6:9,])
@@ -141,6 +156,7 @@ ausw.det <- rbind(ausw.det[1:5,], Detected[11,], ausw.det[6:9,])
 ```
 
 Die folgenden Boxplots zeigen die Werte der 10 Tiere.
+
 ```{r}
 group <- factor(c(rep("Control", 5), rep("Treatment", 5)))
 ID <- c(13, 14, 15, 21, 22, 1, 2, 3, 5, 6)
@@ -154,10 +170,10 @@ library(vsn)
 meanSdPlot(t(normData))
 ```
 
-
 Es zeigen sich keine Auffälligkeiten.
 Abschließend werfen wir noch einen Blick auf die Ähnlichkeit der Tiere mittels
 der Pearson Korrelation.
+
 ```{r}
 Cor <- cor(t(normData), use = "pairwise.complete.obs")
 corPlot(Cor, minCor = 0.95, cex.axis = 0.75, title = "Pearson correlation",
@@ -167,24 +183,19 @@ corPlot(Cor, minCor = 0.95, cex.axis = 0.75, title = "Pearson correlation",
 Zum Teil zeigen die Tiere innerhalb der experimentellen Gruppen eine sehr hohe
 Ähnlichkeit.
 
-#Statistische Analyse
+
+# Statistische Analyse
+
 Wir verwenden den empirischen Bayes-Ansatz aus dem Bioconductor Paket limma
 für die statistische Analyse.
+
 ```{r}
-#library(limma)
-#lev <- levels(group)
-#design <- model.matrix(~0+group)
-#colnames(design) <- levels(group)
-#fit <- lmFit(t(normData), design)
-#contr <- makeContrasts("Treatment-Control", levels=lev)
-#fit <- contrasts.fit(fit, contr)
-#fit <- eBayes(fit)
-#res <- topTable(fit, coef = 1, sort.by = "none", number = Inf)
 res <- mod.t.test(t(normData), group = group)
 ```
 
 Das folgende Histogramm der p-Werte der paarweisen Vergleiche weist darauf hin, dass wir mit
 einigen signifikanten Unterschieden zwischen den Gruppen rechnen können.
+
 ```{r}
 hist(res$p.value, freq = TRUE, breaks = 100,
      main = "Diagnostic Plot: Distribution of p values",
@@ -192,25 +203,21 @@ hist(res$p.value, freq = TRUE, breaks = 100,
 ```
 
 volcano plot
+
 ```{r}
-library(ggplot2)
-farbe <- factor(as.integer(res$adj.p.value < 0.05 & 
-                           abs(res$`difference in means`) > 1))
-ps <- data.frame(pvals = res$adj.p.value, 
-                 logfc = res$`difference in means`,
-                 farbe = farbe)
-ggplot(ps, aes(x = logfc, y = pvals, color = farbe)) + 
-  geom_point() +
-  geom_hline(yintercept = 0.05) + scale_y_neglog10() +
-  geom_vline(xintercept = c(-1, 1)) + 
-  scale_color_manual(values = c("black", "red")) +
-  xlab("log-fold change") + ylab("-log10(adj. p value)") + 
-  ggtitle("Volcano Plot")
+library(MKinfer)
+volcano(res$`difference in means`, pval = res$adj.p.value, 
+        effect0 = 0, effect.low = -1, effect.high = 1, 
+        alpha = 0.25, xlab = "log2-fold Change (log2-FC)",
+        ylab = expression(paste(-log[10], "(adj. p Value)")))
 ```
 
 
 Wir geben die signifikaten Metaboliten aus.
+
 ```{r}
+farbe <- factor(as.integer(res$adj.p.value < 0.05 & 
+                           abs(res$`difference in means`) > 1))
 top <- res[which(farbe == "1"),-c(5,7)]
 names(top)[1] <- "LogFoldChange"
 round(top[order(abs(top[,1]), decreasing = TRUE),], 3)
@@ -252,8 +259,11 @@ Heatmap(selData, col = mycol, name = "log2-FC", show_row_names = TRUE,
         show_heatmap_legend = TRUE)
 ```
 
-#Enrichment Analyse
+
+# Enrichment Analyse
+
 http://www.metaboanalyst.ca/
+
 
 # Verwendete Software
 ```{r}

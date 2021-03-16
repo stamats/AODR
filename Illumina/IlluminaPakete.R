@@ -1,5 +1,5 @@
 ###############################################################################
-## Benötigte Pakete für die Analyse der Illumina Daten
+## Benötigte Pakete für die Analyse der Illumina Mikroarray Daten
 ###############################################################################
 
 if(!require("BiocManager", quietly = TRUE))
@@ -17,6 +17,9 @@ if(!require("arrayQualityMetrics", quietly = TRUE))
 
 if(!require("vsn", quietly = TRUE))
   install("vsn", update = FALSE)
+
+if(!require("limma", quietly = TRUE))
+  install("limma", update = FALSE)
 
 if(!require("MKomics", quietly = TRUE))
   install.packages("MKomics")

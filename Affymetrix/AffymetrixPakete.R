@@ -1,5 +1,5 @@
 ###############################################################################
-## Benötigte Pakete für die Analyse der Affymetrix Daten
+## Benötigte Pakete für die Analyse der Affymetrix Mikroarray Daten
 ###############################################################################
 
 if(!require("BiocManager", quietly = TRUE))

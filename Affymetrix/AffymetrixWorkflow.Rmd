@@ -321,7 +321,9 @@ verschiedenen Genlisten heranziehen.
 Sehr viele signifikante Unterschiede! Kann man nicht alle einzeln biologisch 
 analysieren.
 
+
 # Enrichment Analyse
+
 Einige Beispiele von Bioconductor:
 https://guangchuangyu.github.io/software/DOSE/
 
