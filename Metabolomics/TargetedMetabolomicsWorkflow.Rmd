@@ -223,7 +223,7 @@ names(top)[1] <- "LogFoldChange"
 round(top[order(abs(top[,1]), decreasing = TRUE),], 3)
 ```
 
-Wir erhalten 52 signifikante Metaboliten. Unberücksichtigt sind bisher LOD und
+Wir erhalten 23 signifikante Metaboliten. Unberücksichtigt sind bisher LOD und
 LLOQ. Wir stellen die signifikanten Metaboliten mit Hilfe einer Heatmap 
 graphisch dar.
 
