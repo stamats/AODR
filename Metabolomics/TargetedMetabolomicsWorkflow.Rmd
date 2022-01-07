@@ -206,9 +206,10 @@ volcano plot
 
 ```{r}
 library(MKinfer)
-volcano(res$`difference in means`, pval = res$adj.p.value, 
+ind.na <- is.na(res$adj.p.value)
+volcano(res$`difference in means`[!ind.na], pval = res$adj.p.value[!ind.na], 
         effect0 = 0, effect.low = -1, effect.high = 1, 
-        alpha = 0.25, xlab = "log2-fold Change (log2-FC)",
+        alpha = 0.5, xlab = "log2-fold Change (log2-FC)",
         ylab = expression(paste(-log[10], "(adj. p Value)")))
 ```
 
