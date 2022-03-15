@@ -1,0 +1,378 @@
+---
+title: "Affymetrix Workflow"
+author: "M. Kohl"
+date: "August 2020"
+output:
+  rmarkdown::html_document:
+    toc: true
+    number_sections: true
+    theme: united
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+## setup für die Chunks
+knitr::opts_chunk$set(echo = TRUE, error = TRUE)
+```
+
+
+# Einleitung
+
+Beschreibung des Experimentes, des Datensatzes, der Hypothesen, etc.
+
+
+# Einlesen der Daten
+
+Daten finden sich als Datensatz GSE2634 im Gene Expression Omnibus:
+https://www.ncbi.nlm.nih.gov/geo/
+
+Direkter Link:
+https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE2634&format=file
+
+Sie benötigen für das Entpacken des tar-Archives evtl. einen eigene Software. 
+Eine gute und kostenlose Archiv-Software ist 7zip (siehe: http://www.7-zip.de/)
+
+Entpacken Sie die Dateien in einen Unterordner mit Namen "Daten". 
+Anschließend entfernen Sie alle Dateien außer GSM50690.CEL.gz, GSM50691.CEL.gz, 
+..., GSM50697.CEL.gz
+
+```{r}
+library(affy)
+```
+
+```{r, cache = TRUE}
+## Auflistung der CEL-Dateien
+Dateien <- list.files("./Daten/", full.names = TRUE)
+## Einlesen der CEL-Dateien
+Daten <- ReadAffy(filenames=Dateien)
+Daten
+```
+
+
+# Qualitätskontrolle
+
+```{r, eval=FALSE}
+library(arrayQualityMetrics)
+arrayQualityMetrics(Daten, outdir = "QC", force = TRUE, do.logtransform = TRUE)
+```
+
+
+# Vorverarbeitung
+
+Laden der benötigten Pakete.
+
+```{r}
+library(gcrma)
+library(vsn)
+library(RobLoxBioC)
+library(plier)
+```
+
+Durchführung der Vorverarbeitung.
+Ziele: 
+- Technische Variabilität reduzieren
+- (näherungsweise) Normalverteilungen mit konstanten Varianzen
+
+```{r, cache = TRUE}
+Daten.rma <- rma(Daten)
+Daten.gcrma <- gcrma(Daten)
+Daten.vsnrma <- vsnrma(Daten)
+Daten.mas5 <- robloxbioc(Daten, normalize = TRUE)
+Daten.plier <- justPlier(Daten, normalize = TRUE)
+## Für spätere Verwendung
+#save(file = "NormalisierteDaten.RData",
+#     Daten.mas5, Daten.gcrma, Daten.rma,
+#     Daten.vsnrma, Daten.plier)
+#load(file = "NormalisierteDaten.RData")
+```
+
+
+# Qualitätskontrolle der vorvearbeiteten Daten
+
+Mean-Sd-Plots: Konstante Varianz/SD überprüfen
+
+```{r}
+library(vsn)
+meanSdPlot(Daten.rma)
+meanSdPlot(Daten.gcrma)
+meanSdPlot(Daten.vsnrma)
+meanSdPlot(log2(exprs(Daten.mas5)))
+meanSdPlot(Daten.plier)
+```
+
+Berechnung der Pearson Korrelationen.
+
+```{r}
+library(MKomics)
+cor.mas5 <- cor(log2(exprs(Daten.mas5)))
+cor.rma <- cor(exprs(Daten.rma))
+cor.gcrma <- cor(exprs(Daten.gcrma))
+cor.plier <- cor(exprs(Daten.plier))
+cor.vsnrma <- cor(exprs(Daten.vsnrma))
+```
+
+Plot der Similarity: Erkennen/Identifizieren von Ausreißern
+Anstieg der Ähnlichkeit durch Vorverarbeitung
+
+```{r}
+corPlot(cor.mas5, minCor = 0.75, labels = pData(Daten)[,1], title = "MAS 5.0")
+corPlot(cor.rma, minCor = 0.85, labels = pData(Daten)[,1], title = "RMA")
+corPlot(cor.vsnrma, minCor = 0.80, labels = pData(Daten)[,1], title = "VSN-RMA")
+corPlot(cor.gcrma, minCor = 0.85, labels = pData(Daten)[,1], title = "GC-RMA")
+corPlot(cor.plier, minCor = 0.50, labels = pData(Daten)[,1], title = "PLIER")
+```
+
+Mean-Sd-Plot und Ähnlichkeitsplots sprechen tendenziell für RMA Verfahren.
+
+```{r}
+## range = 0: whiskers bis zu den extremesten Datenpunkten
+boxplot(log2(exprs(Daten.mas5)), range = 0, main = "MAS 5.0")
+boxplot(exprs(Daten.rma), range = 0, main = "RMA")
+boxplot(exprs(Daten.gcrma), range = 0, main = "GC-RMA")
+boxplot(exprs(Daten.vsnrma), range = 0, main = "VSN-RMA")
+boxplot(exprs(Daten.plier), range = 0, main = "PLIER")
+```
+
+Box- und Whisker-Plots sprechen für RMA und VSN-RMA.
+
+
+# Unspezifisches Filtern
+
+Weiter ohne die Ergebnisse von plier. Bei plier müsste ein Filtern mit 
+Signalintensität und Signalvariabilität durchgeführt werden.
+Auch MAS 5.0 Ergebnisse werden nicht weiterverfolgt. 
+
+Unspezifisches Filtern mit SD.
+
+```{r}
+library(genefilter)
+SD.rma <- rowSds(exprs(Daten.rma))
+SD.gcrma <- rowSds(exprs(Daten.gcrma))
+SD.vsnrma <- rowSds(exprs(Daten.vsnrma))
+```
+
+Graphische Darstellung der SDs.
+
+```{r}
+boxplot(list(RMA = SD.rma, GCRMA = SD.gcrma, VSNRMA = SD.vsnrma),
+        range = 0)
+```
+
+Wähle 25% Gene mit höchster Variabilität/Information.
+
+```{r}
+cut.rma <- quantile(SD.rma, prob = 0.75)
+RMA.fi <- exprs(Daten.rma)[SD.rma > cut.rma,]
+cut.gcrma <- quantile(SD.gcrma, prob = 0.75)
+GCRMA.fi <- exprs(Daten.gcrma)[SD.gcrma > cut.gcrma,]
+cut.vsnrma <- quantile(SD.vsnrma, prob = 0.75)
+VSNRMA.fi <- exprs(Daten.vsnrma)[SD.vsnrma > cut.vsnrma,]
+```
+
+Nochmals kurze Qualitätskontrolle zur Auswahl des am besten geeigneten 
+vorverarbeiteten Datensatzes für die statistische Analyse.
+
+```{r}
+meanSdPlot(RMA.fi)
+meanSdPlot(GCRMA.fi)
+meanSdPlot(VSNRMA.fi)
+```
+
+Similarity der Arrays.
+```{r}
+cor.rma <- cor(RMA.fi)
+cor.gcrma <- cor(GCRMA.fi)
+cor.vsnrma <- cor(VSNRMA.fi)
+corPlot(cor.rma, minCor = 0.7, labels = pData(Daten)[,1], title = "RMA")
+corPlot(cor.gcrma, minCor = 0.78, labels = pData(Daten)[,1], title = "GC-RMA")
+corPlot(cor.vsnrma, minCor = 0.78, labels = pData(Daten)[,1], title = "VSN-RMA")
+```
+
+Entscheidung für RMA, da mean-SD-Plot am homogensten wirkt.
+
+
+# Statistische Analyse
+
+Einlesen der Information zu den Samples.
+
+```{r}
+#load(file = "RMAfi.RData")
+sampleInfo <- read.csv2(file = "GSE2634.csv")[1:8,]
+group <- factor(c(rep("A1", 4), rep("A2", 4)))
+```
+
+Erster statistischer Test Wilcoxon-Mann-Withney Rangsummen U-Test.
+
+```{r}
+library(exactRankTests)
+wfun <- function(x, g){ 
+  wilcox.exact(x~g)$p.value
+}
+wilcox.pval <- apply(RMA.fi, 1, wfun, g = group)
+```
+
+Histogramm der p Werte.
+```{r}
+hist(wilcox.pval, breaks = seq(from = 0, to = 1, by = 0.01))
+```
+
+Adjustieren der p Werte wegen multiplem Testen.
+
+```{r}
+library(multtest)
+wilcox.pval.adj <- mt.rawp2adjp(wilcox.pval)
+colSums(wilcox.pval.adj$adjp < 0.05)
+```
+
+Keine signifikanten Unterschiede nach Adjustierung der p Werte!
+
+Als Alternative der Welch t-Test.
+
+```{r}
+tfun <- function(x, g){
+  t.test(x~g)$p.value
+}
+t.pval <- apply(RMA.fi, 1, tfun, g = group)
+```
+
+Histogramm der p Werte.
+
+```{r}
+hist(t.pval, breaks = seq(from = 0, to = 1, by = 0.01))
+```
+
+Adjustieren der p Werte wegen multiplem Testen.
+
+```{r}
+t.pval.adj <- mt.rawp2adjp(t.pval)
+colSums(t.pval.adj$adjp < 0.05)
+```
+
+Verwendung eines sog. moderierten t-Tests.
+
+```{r}
+library(limma)
+#limmaUsersGuide()
+Design <- model.matrix(~ 0 + group)
+colnames(Design) <- c("A1", "A2")
+Design
+fit <- lmFit(RMA.fi, Design)
+cont.matrix <- makeContrasts(A1vsA2 = A1-A2, levels=Design)
+fit <- contrasts.fit(fit, cont.matrix)
+fit <- eBayes(fit)
+limma.res <- topTable(fit, number = Inf, coef = "A1vsA2", adjust = "BH")
+limma.pval.adj <- mt.rawp2adjp(limma.res$P.Value)
+colSums(limma.pval.adj$adjp < 0.05)
+```
+
+
+Oder kürzer ...
+
+```{r}
+library(MKomics)
+res <- mod.t.test(x = RMA.fi, group = group)
+colSums(res[,c(5,6)] < 0.05)
+```
+
+Vulkanplot für die Ergebnisse des moderierten t-Tests.
+
+```{r}
+library(MKinfer)
+volcano(res$`difference in means`, pval = res$adj.p.value, 
+        effect0 = 0, effect.low = -1, effect.high = 1, 
+        alpha = 0.25, xlab = "log2-fache Veränderung (log2-FC)",
+        ylab = expression(paste(-log[10], "(adj. p Wert)")))
+```
+
+Erzeuge Heatmaps der Ergebnisse. 
+
+```{r}
+library(ComplexHeatmap)
+library(circlize)
+library(RColorBrewer)
+## Auswahl der Daten
+sel <- res$adj.p.value < 0.05 & abs(res$`difference in means`) > 1
+selData <- RMA.fi[sel,]
+selData <- selData - rowMeans(selData, na.rm = TRUE)
+colnames(selData) <- as.character(group)
+## Festlegen der Farben
+col1 <- rev(brewer.pal(n = 8, name = "RdYlBu"))
+col2 <- brewer.pal(n = 3, name = "Set1")[c(3,1)]
+mycol <- colorRamp2(seq(-2, 2, length = 128), colorRampPalette(col1)(128))
+## Annotation
+df <- data.frame(Gruppe = group)
+ha <- HeatmapAnnotation(df = df,
+                        col = list(Gruppe = c("A1" = col2[1],
+                                              "A2" = col2[2])))
+## Zeichnen der Heatmap
+Heatmap(selData, col = mycol, name = "log2-FC", show_row_names = FALSE,
+        top_annotation = ha, show_column_names = TRUE,
+        column_names_gp = gpar(fontsize = 8),
+        clustering_distance_columns = "pearson",
+        show_row_dend = FALSE, km = 8,
+        cluster_columns = TRUE, show_column_dend = TRUE,
+        column_title = "Adj. p Wert < 0.05 und |log2-FC| > 1",
+        show_heatmap_legend = TRUE)
+```
+
+Bei mehr Gruppen, könnte man z.B. ein Venndiagramm zum Vergleich der 
+verschiedenen Genlisten heranziehen.
+
+Sehr viele signifikante Unterschiede! Kann man nicht alle einzeln biologisch 
+analysieren.
+
+
+# Enrichment Analyse
+
+Einige Beispiele von Bioconductor:
+https://guangchuangyu.github.io/software/DOSE/
+
+https://yulab-smu.github.io/clusterProfiler-book/
+
+http://www.bioconductor.org/packages/release/bioc/vignettes/InterMineR/inst/doc/Enrichment_Analysis_and_Visualization.html
+
+Wir wenden zwei Funktionen aus dem Paket limma an. 
+
+Anlegen der Genlisten.
+
+```{r}
+library(org.Hs.eg.db)
+library(hgu133plus2.db)
+GeneID <- select(hgu133plus2.db, keys = keys(hgu133plus2.db), 
+                 columns = "ENTREZID")
+keys.UP <- rownames(res)[(res$`difference in means` > 0 & 
+                            res$adj.p.value < 0.05)]
+keys.DN <- rownames(res)[(res$`difference in means` < 0 & 
+                            res$adj.p.value < 0.05)]
+GeneID.UP <- select(hgu133plus2.db, keys = keys.UP, columns = "ENTREZID")
+GeneID.DN <- select(hgu133plus2.db, keys = keys.DN, columns = "ENTREZID")
+```
+
+Berechnung des Enrichment für GO (gene ontology)
+
+```{r}
+go <- goana(list(Up = unique(GeneID.UP$ENTREZID), 
+                 Down = unique(GeneID.DN$ENTREZID)), 
+            universe = unique(GeneID$ENTREZID), 
+            species = "Hs")
+topGO(go, sort = "up")
+topGO(go, sort = "down")
+```
+
+Berechnung des Enrichment für KEGG
+
+```{r}
+kg <- kegga(list(Up = unique(GeneID.UP$ENTREZID), 
+                 Down = unique(GeneID.DN$ENTREZID)), 
+            universe = unique(GeneID$ENTREZID), 
+            species = "Hs")
+topKEGG(kg, sort = "up")
+topKEGG(kg, sort = "down")
+```
+
+
+# Verwendete Software
+
+```{r}
+sessionInfo()
+```

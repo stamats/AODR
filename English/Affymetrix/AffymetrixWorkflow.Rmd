@@ -1,0 +1,293 @@
+---
+title: "Affymetrix Workflow"
+author: "M. Kohl"
+date: "March 2021"
+output:
+  rmarkdown::html_document:
+    toc: true
+    number_sections: true
+    theme: united
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+## setup für die Chunks
+knitr::opts_chunk$set(echo = TRUE, error = TRUE)
+```
+
+
+# Introduction
+
+
+# Import of Data
+
+Download GSE2634 from Gene Expression Omnibus:
+https://www.ncbi.nlm.nih.gov/geo/
+
+Direct Link:
+https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE2634&format=file
+
+You might need some archive software to extract the data; see for instance
+7zip (http://www.7-zip.de/)
+
+Extract the files in a subfolder with name "Data". 
+Remove all files except for GSM50690.CEL.gz, GSM50691.CEL.gz, ..., GSM50697.CEL.gz
+
+
+```{r}
+library(affy)
+```
+
+
+```{r, cache = TRUE}
+## List CEL files
+FileNames <- list.files("./Data/", full.names = TRUE)
+## Import CEL files
+affyData <- ReadAffy(filenames = FileNames)
+affyData
+```
+
+
+# Quality Control
+
+```{r, eval=FALSE}
+library(arrayQualityMetrics)
+arrayQualityMetrics(affyData, outdir = "QC", force = TRUE, 
+                    do.logtransform = TRUE)
+```
+
+
+# Preprocessing
+
+```{r}
+library(gcrma)
+library(vsn)
+library(RobLoxBioC)
+library(plier)
+```
+
+
+```{r, cache = TRUE}
+affyData.rma <- rma(affyData)
+affyData.gcrma <- gcrma(affyData)
+affyData.vsnrma <- vsnrma(affyData)
+affyData.mas5 <- robloxbioc(affyData, normalize = TRUE)
+affyData.plier <- justPlier(affyData, normalize = TRUE)
+```
+
+
+# Quality Control of Preprocessed Data
+
+```{r}
+library(vsn)
+meanSdPlot(affyData.rma)
+meanSdPlot(affyData.gcrma)
+meanSdPlot(affyData.vsnrma)
+meanSdPlot(log2(exprs(affyData.mas5)))
+meanSdPlot(affyData.plier)
+```
+
+
+```{r}
+library(MKomics)
+cor.mas5 <- cor(log2(exprs(affyData.mas5)))
+cor.rma <- cor(exprs(affyData.rma))
+cor.gcrma <- cor(exprs(affyData.gcrma))
+cor.plier <- cor(exprs(affyData.plier))
+cor.vsnrma <- cor(exprs(affyData.vsnrma))
+```
+
+
+```{r}
+corPlot(cor.mas5, minCor = 0.75, labels = pData(affyData)[,1], title = "MAS 5.0")
+corPlot(cor.rma, minCor = 0.85, labels = pData(affyData)[,1], title = "RMA")
+corPlot(cor.vsnrma, minCor = 0.80, labels = pData(affyData)[,1], title = "VSN-RMA")
+corPlot(cor.gcrma, minCor = 0.85, labels = pData(affyData)[,1], title = "GC-RMA")
+corPlot(cor.plier, minCor = 0.50, labels = pData(affyData)[,1], title = "PLIER")
+```
+
+
+```{r}
+## range = 0: whiskers to most extreme data points
+boxplot(log2(exprs(affyData.mas5)), range = 0, main = "MAS 5.0")
+boxplot(exprs(affyData.rma), range = 0, main = "RMA")
+boxplot(exprs(affyData.gcrma), range = 0, main = "GC-RMA")
+boxplot(exprs(affyData.vsnrma), range = 0, main = "VSN-RMA")
+boxplot(exprs(affyData.plier), range = 0, main = "PLIER")
+```
+
+
+# Unspecific Filtering
+
+```{r}
+library(genefilter)
+SD.rma <- rowSds(exprs(affyData.rma))
+SD.gcrma <- rowSds(exprs(affyData.gcrma))
+SD.vsnrma <- rowSds(exprs(affyData.vsnrma))
+```
+
+
+```{r}
+boxplot(list(RMA = SD.rma, GCRMA = SD.gcrma, VSNRMA = SD.vsnrma),
+        range = 0)
+```
+
+
+```{r}
+cut.rma <- quantile(SD.rma, prob = 0.75)
+RMA.fi <- exprs(affyData.rma)[SD.rma > cut.rma,]
+cut.gcrma <- quantile(SD.gcrma, prob = 0.75)
+GCRMA.fi <- exprs(affyData.gcrma)[SD.gcrma > cut.gcrma,]
+cut.vsnrma <- quantile(SD.vsnrma, prob = 0.75)
+VSNRMA.fi <- exprs(affyData.vsnrma)[SD.vsnrma > cut.vsnrma,]
+```
+
+
+```{r}
+meanSdPlot(RMA.fi)
+meanSdPlot(GCRMA.fi)
+meanSdPlot(VSNRMA.fi)
+```
+
+
+```{r}
+cor.rma <- cor(RMA.fi)
+cor.gcrma <- cor(GCRMA.fi)
+cor.vsnrma <- cor(VSNRMA.fi)
+corPlot(cor.rma, minCor = 0.7, labels = pData(affyData)[,1], title = "RMA")
+corPlot(cor.gcrma, minCor = 0.78, labels = pData(affyData)[,1], title = "GC-RMA")
+corPlot(cor.vsnrma, minCor = 0.78, labels = pData(affyData)[,1], title = "VSN-RMA")
+```
+
+
+# Statistical Analysis
+
+```{r}
+group <- factor(c(rep("A1", 4), rep("A2", 4)))
+```
+
+
+```{r}
+library(exactRankTests)
+wfun <- function(x, g){ 
+  wilcox.exact(x~g)$p.value
+}
+wilcox.pval <- apply(RMA.fi, 1, wfun, g = group)
+```
+
+
+```{r}
+hist(wilcox.pval, breaks = seq(from = 0, to = 1, by = 0.01))
+```
+
+
+```{r}
+library(multtest)
+wilcox.pval.adj <- mt.rawp2adjp(wilcox.pval)
+colSums(wilcox.pval.adj$adjp < 0.05)
+```
+
+
+```{r}
+tfun <- function(x, g){
+  t.test(x~g)$p.value
+}
+t.pval <- apply(RMA.fi, 1, tfun, g = group)
+```
+
+
+```{r}
+hist(t.pval, breaks = seq(from = 0, to = 1, by = 0.01))
+```
+
+
+```{r}
+t.pval.adj <- mt.rawp2adjp(t.pval)
+colSums(t.pval.adj$adjp < 0.05)
+```
+
+
+```{r}
+library(limma)
+library(MKomics)
+res <- mod.t.test(x = RMA.fi, group = group)
+colSums(res[,c(5,6)] < 0.05)
+```
+
+
+```{r}
+library(MKinfer)
+volcano(res$`difference in means`, pval = res$adj.p.value, 
+        effect0 = 0, effect.low = -1, effect.high = 1, 
+        alpha = 0.25, xlab = "log2-fold Change (log2-FC)",
+        ylab = expression(paste(-log[10], "(adj. p Value)")))
+```
+
+
+```{r}
+library(ComplexHeatmap)
+library(circlize)
+library(RColorBrewer)
+sel <- res$adj.p.value < 0.05 & abs(res$`difference in means`) > 1
+selData <- RMA.fi[sel,]
+selData <- selData - rowMeans(selData, na.rm = TRUE)
+colnames(selData) <- as.character(group)
+col1 <- rev(brewer.pal(n = 8, name = "RdYlBu"))
+col2 <- brewer.pal(n = 3, name = "Set1")[c(3,1)]
+mycol <- colorRamp2(seq(-2, 2, length = 128), colorRampPalette(col1)(128))
+df <- data.frame(Group = group)
+ha <- HeatmapAnnotation(df = df,
+                        col = list(Group = c("A1" = col2[1],
+                                             "A2" = col2[2])))
+Heatmap(selData, col = mycol, name = "log2-FC", show_row_names = FALSE,
+        top_annotation = ha, show_column_names = TRUE,
+        column_names_gp = gpar(fontsize = 8),
+        clustering_distance_columns = "pearson",
+        show_row_dend = FALSE, km = 8,
+        cluster_columns = TRUE, show_column_dend = TRUE,
+        column_title = "Adj. p Value < 0.05 and |log2-FC| > 1",
+        show_heatmap_legend = TRUE)
+```
+
+
+# Enrichment Analysis
+
+```{r}
+library(org.Hs.eg.db)
+library(hgu133plus2.db)
+GeneID <- select(hgu133plus2.db, keys = keys(hgu133plus2.db), 
+                 columns = "ENTREZID")
+keys.UP <- rownames(res)[(res$`difference in means` > 0 & 
+                            res$adj.p.value < 0.05)]
+keys.DN <- rownames(res)[(res$`difference in means` < 0 & 
+                            res$adj.p.value < 0.05)]
+GeneID.UP <- select(hgu133plus2.db, keys = keys.UP, columns = "ENTREZID")
+GeneID.DN <- select(hgu133plus2.db, keys = keys.DN, columns = "ENTREZID")
+```
+
+
+```{r}
+go <- goana(list(Up = unique(GeneID.UP$ENTREZID), 
+                 Down = unique(GeneID.DN$ENTREZID)), 
+            universe = unique(GeneID$ENTREZID), 
+            species = "Hs")
+topGO(go, sort = "up")
+topGO(go, sort = "down")
+```
+
+
+```{r}
+kg <- kegga(list(Up = unique(GeneID.UP$ENTREZID), 
+                 Down = unique(GeneID.DN$ENTREZID)), 
+            universe = unique(GeneID$ENTREZID), 
+            species = "Hs")
+topKEGG(kg, sort = "up")
+topKEGG(kg, sort = "down")
+```
+
+
+# Software
+
+```{r}
+sessionInfo()
+```
