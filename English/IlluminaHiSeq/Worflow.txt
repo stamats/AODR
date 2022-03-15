@@ -1,0 +1,51 @@
+1. Download of data SRR*.1 files
+-> duration: several days (12 files, 117.9 GB)
+
+2. Installation of NCBI sra toolkit
+https://trace.ncbi.nlm.nih.gov/Traces/sra/sra.cgi?view=software
+-> duration: minutes
+
+3. Convert SRR*.1 files into fastq.gzip (fastq.gz) files
+fastq-dump -I --split-files --gzip SRR*.1
+(--split-files: paired-end data, two reads per spot)
+-> duration: about 15 hours (24 files, 157.3 GB)
+
+4. Installation of salmon
+https://combine-lab.github.io/alevin-tutorial/2019/selective-alignment/
+-> duration: minutes
+
+5. Download of
+ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_34/gencode.v34.transcripts.fa.gz
+ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_34/GRCh38.primary_assembly.genome.fa.gz
+-> duration: minutes (917.8 MB)
+
+6. Generate salmon index
+grep "^>" <(zcat GRCh38.primary_assembly.genome.fa.gz) | cut -d " " -f 1 > decoys.txt
+
+sed -i -e 's/>//g' decoys.txt
+
+cat gencode.v34.transcripts.fa.gz GRCh38.primary_assembly.genome.fa.gz > gentrome.fa.gz
+
+salmon index -t gentrome.fa.gz -d decoys.txt -p 46 -i salmon_index
+-> duration: minutes
+
+7. Quantify with salmon
+#!/bin/bash
+for fn in data/*_1.fastq.gz
+do
+samp=`basename ${fn}`
+echo "Processing sample ${fn}"
+y=${fn%%_1*}
+echo "Second file ${y}_2.fastq.gz"
+salmon quant -i salmon_index -l A \
+         -1 ${fn} \
+         -2 ${y}_2.fastq.gz \
+         -p 46 --validateMappings -o ${fn}_quant
+done 
+-> duration: about 1h with 46 cores (12 files, 409 MB) 
+
+8. Import Salman Quantification Data into R
+Bioconductor package tximport
+-> Further steps see Analysis.Rmd
+
+

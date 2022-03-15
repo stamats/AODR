@@ -1,0 +1,365 @@
+---
+title: "Analysis of Illumina HiSeq 2000 Data"
+author: "Matthias Kohl"
+date: "March 2021"
+output:
+  rmarkdown::html_document:
+    theme: united
+    highlight: tango
+    toc: true
+---
+
+# Loading of required packages
+
+```{r}
+library(tximport)
+library(EnsDb.Hsapiens.v86)
+library(MKomics)
+library(vsn)
+library(limma)
+library(edgeR)
+library(MKinfer)
+library(VennDiagram)
+library(GO.db)
+library(org.Hs.eg.db)
+library(DESeq2)
+```
+
+
+# Import of Salmon Quantification data
+
+```{r}
+Samples <- read.csv("Samples.csv")
+Samples$Group <- factor(Samples$Group, levels = c("untreated", "TPA", "RA"))
+Samples
+load(file = "txi.RData")
+tx2gene <- transcripts(EnsDb.Hsapiens.v86, 
+                       columns = c("tx_name", "gene_id", "gene_name"),
+                       return.type = "data.frame")
+head(txi$counts)
+cts <- txi$counts
+range(colSums(cts)/1e6)
+```
+
+
+# Quality control of raw data
+
+```{r}
+cts0 <- cts
+cts0[cts0 == 0] <- min(cts0[cts0 != 0])
+boxplot(cts0, log = "y", range = 0, las = 2)
+```
+
+
+```{r}
+Cor <- cor(cts, method = "spearman")
+par(mar=c(5,6,4,2)+0.1)
+corPlot(Cor, minCor = 0.86, labels = Samples$Run, 
+        title = "Spearman correlation")
+```
+
+
+```{r}
+meanSdPlot(log(cts0))
+```
+
+
+# Analysis with edgeR
+
+## Unspecific filtering
+
+```{r}
+normMat <- txi$length
+normMat <- normMat / exp(rowMeans(log(normMat)))
+o <- log(calcNormFactors(cts/normMat)) + log(colSums(cts/normMat))
+y <- DGEList(cts)
+y <- scaleOffset(y, t(t(log(normMat)) + o))
+design <- model.matrix(~Samples$Group)
+keep <- filterByExpr(y, design)
+y <- y[keep,]
+```
+
+
+## Quality control of filtered data
+
+```{r}
+cts0 <- y$counts
+cts0[cts0 == 0] <- min(cts0[cts0 != 0])
+boxplot(cts0, log = "y", range = 0, las = 2)
+```
+
+
+```{r}
+Cor <- cor(y$counts, method = "spearman")
+par(mar=c(5,6,4,2)+0.1)
+corPlot(Cor, minCor = 0.84, labels = Samples$Run, 
+        title = "Spearman correlation")
+```
+
+
+```{r}
+meanSdPlot(log(cts0))
+```
+
+
+## Negative Binomial Modell
+
+```{r}
+y <- estimateDisp(y, design)
+fit <- glmFit(y, design)
+## TPA vs untreated
+lrt.TPA.vs.untr <- glmLRT(fit, coef = 2)
+topTags(lrt.TPA.vs.untr)
+edgeR.lrt.TPA.vs.untr <- topTags(lrt.TPA.vs.untr, n=nrow(y), 
+                                 sort="none")[[1]]
+sum(edgeR.lrt.TPA.vs.untr$FDR < 0.05)
+sum(edgeR.lrt.TPA.vs.untr$FDR < 0.05 & 
+      abs(edgeR.lrt.TPA.vs.untr$logFC) > 1)
+## RA vs untreated
+lrt.RA.vs.untr <- glmLRT(fit, coef = 3)
+topTags(lrt.RA.vs.untr)
+edgeR.lrt.RA.vs.untr <- topTags(lrt.RA.vs.untr, n=nrow(y), 
+                                sort="none")[[1]]
+sum(edgeR.lrt.RA.vs.untr$FDR < 0.05)
+sum(edgeR.lrt.RA.vs.untr$FDR < 0.05 &
+      abs(edgeR.lrt.RA.vs.untr$logFC) > 1)
+## TPA vs RA
+lrt.TPA.vs.RA <- glmLRT(fit, contrast = c(0, -1, 1))
+topTags(lrt.TPA.vs.RA)
+edgeR.lrt.TPA.vs.RA <- topTags(lrt.TPA.vs.RA, n=nrow(y), 
+                               sort="none")[[1]]
+sum(edgeR.lrt.TPA.vs.RA$FDR < 0.05)
+sum(edgeR.lrt.TPA.vs.RA$FDR < 0.05 &
+      abs(edgeR.lrt.TPA.vs.RA$logFC) > 1)
+```
+
+
+```{r}
+## TPA vs untreated
+edgeR.lrt.TPA.vs.untr$FDR[edgeR.lrt.TPA.vs.untr$FDR < 1e-16] <- 1e-16
+volcano(edgeR.lrt.TPA.vs.untr$logFC, 
+        edgeR.lrt.TPA.vs.untr$FDR, effect.low = -1, effect.high = 1,
+        title = "Volcano Plot: TPA vs untreated",
+        alpha = 0.3)
+## RA vs untreated
+edgeR.lrt.RA.vs.untr$FDR[edgeR.lrt.RA.vs.untr$FDR < 1e-16] <- 1e-16
+volcano(edgeR.lrt.RA.vs.untr$logFC, 
+        edgeR.lrt.RA.vs.untr$FDR, effect.low = -1, effect.high = 1,
+        title = "Volcano Plot: RA vs untreated",
+        alpha = 0.3)
+## TPA vs RA
+edgeR.lrt.TPA.vs.RA$FDR[edgeR.lrt.TPA.vs.RA$FDR < 1e-16] <- 1e-16
+volcano(edgeR.lrt.TPA.vs.RA$logFC, 
+        edgeR.lrt.TPA.vs.RA$FDR, effect.low = -1, effect.high = 1,
+        title = "Volcano Plot: TPA vs RA",
+        alpha = 0.3)
+```
+
+
+```{r}
+ind1 <- (edgeR.lrt.TPA.vs.untr$FDR < 0.05 & 
+          abs(edgeR.lrt.TPA.vs.untr$logFC) > 1)
+ind2 <- (edgeR.lrt.RA.vs.untr$FDR < 0.05 &
+          abs(edgeR.lrt.RA.vs.untr$logFC) > 1)
+ind3 <- (edgeR.lrt.TPA.vs.RA$FDR < 0.05 &
+          abs(edgeR.lrt.TPA.vs.RA$logFC) > 1)
+grid.newpage()
+draw.triple.venn(area1 = sum(ind1), area2 = sum(ind2), area3 = sum(ind3), 
+                 n12 = sum(ind1&ind2), n23 = sum(ind2&ind3), 
+                 n13 = sum(ind1&ind3), n123 = sum(ind1&ind2&ind3),
+                 category = c("TPA vs untr", "RA vs untr", "TPA vs RA"),
+                 fill = c("blue", "red", "green"))
+```
+
+
+## Enrichment analysis
+
+```{r}
+## TPA vs untreated
+GeneID <- mapIds(org.Hs.eg.db, keys = rownames(lrt.TPA.vs.untr), 
+                 keytype = "ENSEMBL", column = "ENTREZID")
+go <- goana.DGELRT(lrt.TPA.vs.untr, geneid = GeneID,
+                   species = "Hs")
+topGO(go, sort = "up")
+topGO(go, sort = "down")
+kg <- kegga.DGELRT(lrt.TPA.vs.untr, geneid = GeneID,
+                   species = "Hs")
+topKEGG(kg, sort = "up")
+topKEGG(kg, sort = "down")
+## RA vs untreated
+GeneID <- mapIds(org.Hs.eg.db, keys = rownames(lrt.RA.vs.untr), 
+                 keytype = "ENSEMBL", column = "ENTREZID")
+go <- goana.DGELRT(lrt.RA.vs.untr, geneid = GeneID,
+                   species = "Hs")
+topGO(go, sort = "up")
+topGO(go, sort = "down")
+kg <- kegga.DGELRT(lrt.RA.vs.untr, geneid = GeneID,
+                   species = "Hs")
+topKEGG(kg, sort = "up")
+topKEGG(kg, sort = "down")
+## TPA vs RA
+GeneID <- mapIds(org.Hs.eg.db, keys = rownames(lrt.TPA.vs.RA), 
+                 keytype = "ENSEMBL", column = "ENTREZID")
+go <- goana.DGELRT(lrt.TPA.vs.RA, geneid = GeneID,
+                   species = "Hs")
+topGO(go, sort = "up")
+topGO(go, sort = "down")
+kg <- kegga.DGELRT(lrt.TPA.vs.RA, geneid = GeneID,
+                   species = "Hs")
+topKEGG(kg, sort = "up")
+topKEGG(kg, sort = "down")
+```
+
+
+# Analysis with DESeq2
+
+## Unspecific filtering
+
+```{r}
+dds <- DESeqDataSetFromTximport(txi,
+                                colData = Samples,
+                                design = ~ Group)
+dds
+keep <- rowSums(counts(dds)) >= 10
+dds <- dds[keep,]
+dds
+```
+
+
+## Quality control of filtered data
+
+```{r}
+cts0 <- counts(dds)
+cts0[cts0 == 0] <- min(cts0[cts0 != 0])
+boxplot(cts0, log = "y", range = 0, las = 2)
+```
+
+
+```{r}
+Cor <- cor(counts(dds), method = "spearman")
+par(mar=c(5,6,4,2)+0.1)
+corPlot(Cor, minCor = 0.84, labels = Samples$Run, 
+        title = "Spearman correlation")
+```
+
+
+```{r}
+meanSdPlot(log(cts0))
+```
+
+
+## Negative Binomial Modell
+
+```{r}
+dds <- DESeq(dds)
+## TPA vs untreated
+res.TPA.vs.untr <- results(dds, contrast = c("Group", "TPA", "untreated"))
+res.TPA.vs.untr
+sum(res.TPA.vs.untr$padj < 0.05, na.rm = TRUE)
+sum(res.TPA.vs.untr$padj < 0.05 & 
+      abs(res.TPA.vs.untr$log2FoldChange) > 1, na.rm = TRUE)
+## RA vs untreated
+res.RA.vs.untr <- results(dds, contrast = c("Group", "RA", "untreated"))
+res.RA.vs.untr
+sum(res.RA.vs.untr$padj < 0.05, na.rm = TRUE)
+sum(res.RA.vs.untr$padj < 0.05 & 
+      abs(res.RA.vs.untr$log2FoldChange) > 1, na.rm = TRUE)
+## TPA vs RA
+res.RA.vs.TPA <- results(dds, contrast = c("Group", "TPA", "RA"))
+res.RA.vs.TPA
+sum(res.RA.vs.TPA$padj < 0.05, na.rm = TRUE)
+sum(res.RA.vs.TPA$padj < 0.05 & 
+      abs(res.RA.vs.TPA$log2FoldChange) > 1, na.rm = TRUE)
+```
+
+
+```{r}
+## TPA vs untreated
+res.TPA.vs.untr$padj[res.TPA.vs.untr$padj < 1e-16] <- 1e-16
+res.TPA.vs.untr$padj[is.na(res.TPA.vs.untr$padj)] <- 1
+volcano(res.TPA.vs.untr$log2FoldChange, 
+        res.TPA.vs.untr$padj, effect.low = -1, effect.high = 1,
+        title = "Volcano Plot: TPA vs untreated",
+        alpha = 0.3)
+## RA vs untreated
+res.RA.vs.untr$padj[res.RA.vs.untr$padj < 1e-16] <- 1e-16
+res.RA.vs.untr$padj[is.na(res.RA.vs.untr$padj)] <- 1
+volcano(res.RA.vs.untr$log2FoldChange, 
+        res.RA.vs.untr$padj, effect.low = -1, effect.high = 1,
+        title = "Volcano Plot: RA vs untreated",
+        alpha = 0.3)
+## TPA vs RA
+res.RA.vs.TPA$padj[res.RA.vs.TPA$padj < 1e-16] <- 1e-16
+res.RA.vs.TPA$padj[is.na(res.RA.vs.TPA$padj)] <- 1
+volcano(res.RA.vs.TPA$log2FoldChange, 
+        res.RA.vs.TPA$padj, effect.low = -1, effect.high = 1,
+        title = "Volcano Plot: TPA vs RA",
+        alpha = 0.3)
+```
+
+
+```{r}
+ind1 <- (res.TPA.vs.untr$padj < 0.05 & 
+          abs(res.TPA.vs.untr$log2FoldChange) > 1)
+ind2 <- (res.RA.vs.untr$padj < 0.05 &
+          abs(res.RA.vs.untr$log2FoldChange) > 1)
+ind3 <- (res.RA.vs.TPA$padj < 0.05 &
+          abs(res.RA.vs.TPA$log2FoldChange) > 1)
+grid.newpage()
+draw.triple.venn(area1 = sum(ind1), area2 = sum(ind2), area3 = sum(ind3), 
+                 n12 = sum(ind1&ind2), n23 = sum(ind2&ind3), 
+                 n13 = sum(ind1&ind3), n123 = sum(ind1&ind2&ind3),
+                 category = c("TPA vs untr", "RA vs untr", "TPA vs RA"),
+                 fill = c("blue", "red", "green"))
+```
+
+
+## Enrichment analysis
+
+```{r}
+## TPA vs untreated
+GeneID <- mapIds(org.Hs.eg.db, keys = rownames(res.TPA.vs.untr), 
+                 keytype = "ENSEMBL", column = "ENTREZID")
+EG.DE.UP <- GeneID[(res.TPA.vs.untr$padj < 0.05 & 
+                      res.TPA.vs.untr$log2FoldChange > 0)]
+EG.DE.DN <- GeneID[(res.TPA.vs.untr$padj < 0.05 & 
+                      res.TPA.vs.untr$log2FoldChange < 0)]
+go <- goana(list(Up = EG.DE.UP, Down = EG.DE.DN), 
+            universe = GeneID, species = "Hs")
+topGO(go, sort = "up")
+topGO(go, sort = "down")
+kg <- kegga(list(Up = EG.DE.UP, Down = EG.DE.DN), 
+            universe = GeneID, species = "Hs")
+topKEGG(kg, sort = "up")
+topKEGG(kg, sort = "down")
+## RA vs untreated
+GeneID <- mapIds(org.Hs.eg.db, keys = rownames(res.RA.vs.untr), 
+                 keytype = "ENSEMBL", column = "ENTREZID")
+EG.DE.UP <- GeneID[(res.RA.vs.untr$padj < 0.05 & 
+                      res.RA.vs.untr$log2FoldChange > 0)]
+EG.DE.DN <- GeneID[(res.RA.vs.untr$padj < 0.05 & 
+                      res.RA.vs.untr$log2FoldChange < 0)]
+go <- goana(list(Up = EG.DE.UP, Down = EG.DE.DN), 
+            universe = GeneID, species = "Hs")
+topGO(go, sort = "up")
+topGO(go, sort = "down")
+kg <- kegga(list(Up = EG.DE.UP, Down = EG.DE.DN), 
+            universe = GeneID, species = "Hs")
+topKEGG(kg, sort = "up")
+topKEGG(kg, sort = "down")
+## TPA vs RA
+GeneID <- mapIds(org.Hs.eg.db, keys = rownames(res.RA.vs.TPA), 
+                 keytype = "ENSEMBL", column = "ENTREZID")
+EG.DE.UP <- GeneID[(res.RA.vs.TPA$padj < 0.05 & 
+                      res.RA.vs.TPA$log2FoldChange > 0)]
+EG.DE.DN <- GeneID[(res.RA.vs.TPA$padj < 0.05 & 
+                      res.RA.vs.TPA$log2FoldChange < 0)]
+go <- goana(list(Up = EG.DE.UP, Down = EG.DE.DN), 
+            universe = GeneID, species = "Hs")
+topGO(go, sort = "up")
+topGO(go, sort = "down")
+kg <- kegga(list(Up = EG.DE.UP, Down = EG.DE.DN), 
+            universe = GeneID, species = "Hs")
+topKEGG(kg, sort = "up")
+topKEGG(kg, sort = "down")
+```
