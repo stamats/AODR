@@ -1,0 +1,277 @@
+---
+title: "Illumina"
+author: "M. Kohl"
+date: "March 2021"
+output:
+  rmarkdown::html_document:
+    toc: true
+    number_sections: true
+    theme: united
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, error = TRUE)
+```
+
+
+# Introduction
+
+
+# Import of Data
+
+Download GSE68849 from Gene Expression Omnibus:
+https://www.ncbi.nlm.nih.gov/geo/
+
+Direct Link:
+https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE68849&format=file&file=GSE68849%5Fnon%2Dnormalized%2Etxt%2Egz
+
+You might need some archive software to extract the data; see for instance
+7zip (http://www.7-zip.de/)
+
+
+```{r}
+library(lumi)
+iluData <- lumiR(fileName = "GSE68849_non-normalized.txt")
+iluData
+library(beadarray)
+iluData2 <- readBeadSummaryData(dataFile = "GSE68849_non-normalized.txt", 
+                                skip = 10, ProbeID = "ID_REF")
+iluData2
+```
+
+
+# Quality Control
+
+```{r}
+library(arrayQualityMetrics)
+arrayQualityMetrics(iluData2, outdir = "QC", force = TRUE,
+                    do.logtransform = TRUE)
+```
+
+
+```{r}
+library(MKomics)
+Cor <- cor(exprs(iluData), method = "spearman")
+op <- par(mar = c(5, 6, 4, 2)+0.1)
+corPlot(Cor, minCor = 0.6, labels = pData(iluData)[,1], 
+        title = "Spearman Correlation")
+par(op)
+```
+
+
+```{r}
+lumi::density(iluData)
+lumi::boxplot(iluData, log = "y")
+```
+
+
+```{r}
+boxplot(beadNum(iluData))
+abline(h = c(0,5))
+```
+
+
+# Preprocessing
+
+```{r}
+Ilu.ri <- rankinvariant(lumiT(iluData, method = "log2"))
+Ilu.rsn <- rsn(lumiT(iluData, method = "log2"))
+Ilu.quan <- lumiN(lumiT(iluData, method = "vst"), method = "quantile")
+Ilu.vsn <- lumiN(iluData, method = "vsn")
+```
+
+
+# Quality Control of Preprocessed Data
+
+```{r}
+library(vsn)
+meanSdPlot(Ilu.ri)
+meanSdPlot(Ilu.rsn)
+meanSdPlot(Ilu.quan)
+meanSdPlot(Ilu.vsn)
+```
+
+
+```{r}
+Cor.ri <- cor(exprs(Ilu.ri)[,c(1,3,5,7,9,2,4,6,8,10)])
+Cor.rsn <- cor(exprs(Ilu.rsn)[,c(1,3,5,7,9,2,4,6,8,10)])
+Cor.quan <- cor(exprs(Ilu.quan)[,c(1,3,5,7,9,2,4,6,8,10)])
+Cor.vsn <- cor(exprs(Ilu.vsn)[,c(1,3,5,7,9,2,4,6,8,10)])
+Lab <- pData(iluData)[c(1,3,5,7,9,2,4,6,8,10),1]
+op <- par(mar = c(5, 6, 4, 2)+0.1)
+corPlot(Cor.ri, minCor = 0.9, labels = Lab, title = "rank invariant")
+corPlot(Cor.rsn, minCor = 0.9, labels = Lab, title = "rsn")
+corPlot(Cor.quan, minCor = 0.9, labels = Lab, title = "quantile")
+corPlot(Cor.vsn, minCor = 0.9, labels = Lab, title = "vsn")
+par(op)
+```
+
+
+```{r}
+boxplot(Ilu.ri, main = "rank invariant")
+boxplot(Ilu.rsn, main = "rsn")
+boxplot(Ilu.quan, main = "quantile")
+boxplot(Ilu.vsn, main = "vsn")
+```
+
+
+# Selection of Detected Bead Types
+
+```{r}
+SampleInfo <- read.csv(file = "Samples.csv")
+SampleInfo$SampleNames <- sampleNames(Ilu.ri)
+```
+
+
+```{r}
+control <- SampleInfo$Agent == "No virus control"
+virus <- !control
+det.control <- rowSums(detection(iluData)[,control] < 0.01) == 5
+sum(det.control)
+det.virus <- rowSums(detection(iluData)[,virus] < 0.01) == 5
+sum(det.virus)
+detected <- det.control | det.virus
+sum(detected)
+```
+
+
+```{r}
+Ilu.ri.det <- Ilu.ri[detected,]
+Ilu.rsn.det <- Ilu.rsn[detected,]
+Ilu.quan.det <- Ilu.quan[detected,]
+Ilu.vsn.det <- Ilu.vsn[detected,]
+```
+
+```{r}
+meanSdPlot(Ilu.ri.det)
+meanSdPlot(Ilu.rsn.det)
+meanSdPlot(Ilu.quan.det)
+meanSdPlot(Ilu.vsn.det)
+```
+
+
+```{r}
+Cor.ri <- cor(exprs(Ilu.ri.det)[,c(1,3,5,7,9,2,4,6,8,10)])
+Cor.rsn <- cor(exprs(Ilu.rsn.det)[,c(1,3,5,7,9,2,4,6,8,10)])
+Cor.quan <- cor(exprs(Ilu.quan.det)[,c(1,3,5,7,9,2,4,6,8,10)])
+Cor.vsn <- cor(exprs(Ilu.vsn.det)[,c(1,3,5,7,9,2,4,6,8,10)])
+op <- par(mar = c(5, 6, 4, 2)+0.1)
+corPlot(Cor.ri, minCor = 0.9, labels = Lab, title = "rank invariant")
+corPlot(Cor.rsn, minCor = 0.9, labels = Lab, title = "rsn")
+corPlot(Cor.quan, minCor = 0.9, labels = Lab, title = "quantile")
+corPlot(Cor.vsn, minCor = 0.9, labels = Lab, title = "vsn")
+par(op)
+```
+
+
+```{r}
+boxplot(Ilu.ri.det, main = "rank invariant")
+boxplot(Ilu.rsn.det, main = "rsn")
+boxplot(Ilu.quan.det, main = "quantile")
+boxplot(Ilu.vsn.det, main = "vsn")
+```
+
+
+# Statistical Analysis
+
+```{r}
+library(MKomics)
+library(multtest)
+group <- factor(as.integer(SampleInfo$Agent == "Influenza A"))
+subjectID <- factor(rep(1:5, each = 2))
+res.paired <- mod.t.test(exprs(Ilu.rsn.det),
+                  group = group, 
+                  paired = TRUE,
+                  subject = subjectID,
+                  sort.by = "B")
+colSums(mt.rawp2adjp(res.paired$p.value)$adjp < 0.05)
+```
+
+
+```{r}
+tfun.paired <- function(x, g){
+  t.test(x ~ g, paired = TRUE)$p.value
+}
+res.t.paired <- apply(exprs(Ilu.rsn.det), 1, tfun.paired, g = group)
+colSums(mt.rawp2adjp(res.t.paired)$adjp < 0.05)
+```
+
+
+```{r}
+library(MKinfer)
+volcano(res.paired$`mean of differences`, pval = res.paired$adj.p.value, 
+        effect.low = -1, effect.high = 1, alpha = 0.4,
+        xlab = "log2-fold Change (log2-FC)", 
+        ylab = expression(paste(-log[10], "(adj. p value)")))
+```
+
+
+```{r}
+library(ComplexHeatmap)
+library(circlize)
+library(RColorBrewer)
+sel <- res.paired$adj.p.value < 0.05 & abs(res.paired$`mean of differences`) > 1
+selData <- exprs(Ilu.rsn.det)[sel,]
+selData <- selData - rowMeans(selData, na.rm = TRUE)
+colnames(selData) <- paste0(SampleInfo$Donor, ": ", SampleInfo$Agent)
+col1 <- rev(brewer.pal(n = 8, name = "RdYlBu"))
+col2 <- brewer.pal(n = 3, name = "Set1")[c(3,1)]
+mycol <- colorRamp2(seq(-2, 2, length = 128), colorRampPalette(col1)(128))
+df <- data.frame(Group = SampleInfo$Agent)
+ha <- HeatmapAnnotation(df = df,
+                        col = list(Group = c("No virus control" = col2[1],
+                                             "Influenza A" = col2[2])))
+Heatmap(selData, col = mycol, name = "log2-FC", show_row_names = FALSE,
+        top_annotation = ha, show_column_names = TRUE,
+        column_names_gp = gpar(fontsize = 8),
+        clustering_distance_columns = "pearson",
+        show_row_dend = FALSE, km = 4,
+        cluster_columns = TRUE, show_column_dend = TRUE,
+        column_title = "Adj. p Value < 0.05 and |log2-FC| > 1",
+        show_heatmap_legend = TRUE)
+```
+
+
+# Enrichment Analysis
+
+```{r}
+library(org.Hs.eg.db)
+library(illuminaHumanv4.db)
+GeneID <- select(illuminaHumanv4.db, keys = keys(illuminaHumanv4.db), 
+                 columns = "ENTREZID")
+keys.UP <- rownames(res.paired)[(res.paired$`mean of differences` > 0 & 
+                                   res.paired$adj.p.value < 0.05)]
+keys.DN <- rownames(res.paired)[(res.paired$`mean of differences` < 0 & 
+                                   res.paired$adj.p.value < 0.05)]
+GeneID.UP <- select(illuminaHumanv4.db, keys = keys.UP, columns = "ENTREZID")
+GeneID.DN <- select(illuminaHumanv4.db, keys = keys.DN, columns = "ENTREZID")
+```
+
+
+```{r}
+library(limma)
+go <- goana(list(Up = unique(GeneID.UP$ENTREZID), 
+                 Down = unique(GeneID.DN$ENTREZID)), 
+            universe = unique(GeneID$ENTREZID), 
+            species = "Hs")
+topGO(go, sort = "up")
+topGO(go, sort = "down")
+```
+
+
+```{r}
+kg <- kegga(list(Up = unique(GeneID.UP$ENTREZID), 
+                 Down = unique(GeneID.DN$ENTREZID)), 
+            universe = unique(GeneID$ENTREZID), 
+            species = "Hs")
+topKEGG(kg, sort = "up")
+topKEGG(kg, sort = "down")
+```
+
+
+# Software
+
+```{r}
+sessionInfo()
+```
