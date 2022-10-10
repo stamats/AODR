@@ -1,7 +1,7 @@
 ---
 title: "Affymetrix Workflow"
 author: "M. Kohl"
-date: "March 2021"
+date: "October 2022"
 output:
   rmarkdown::html_document:
     toc: true
@@ -99,11 +99,11 @@ cor.vsnrma <- cor(exprs(affyData.vsnrma))
 
 
 ```{r}
-corPlot(cor.mas5, minCor = 0.75, labels = pData(affyData)[,1], title = "MAS 5.0")
-corPlot(cor.rma, minCor = 0.85, labels = pData(affyData)[,1], title = "RMA")
-corPlot(cor.vsnrma, minCor = 0.80, labels = pData(affyData)[,1], title = "VSN-RMA")
-corPlot(cor.gcrma, minCor = 0.85, labels = pData(affyData)[,1], title = "GC-RMA")
-corPlot(cor.plier, minCor = 0.50, labels = pData(affyData)[,1], title = "PLIER")
+corPlot2(cor.mas5, minCor = 0.75, labels = pData(affyData)[,1], title = "MAS 5.0")
+corPlot2(cor.rma, minCor = 0.85, labels = pData(affyData)[,1], title = "RMA")
+corPlot2(cor.vsnrma, minCor = 0.80, labels = pData(affyData)[,1], title = "VSN-RMA")
+corPlot2(cor.gcrma, minCor = 0.85, labels = pData(affyData)[,1], title = "GC-RMA")
+corPlot2(cor.plier, minCor = 0.50, labels = pData(affyData)[,1], title = "PLIER")
 ```
 
 
@@ -154,9 +154,9 @@ meanSdPlot(VSNRMA.fi)
 cor.rma <- cor(RMA.fi)
 cor.gcrma <- cor(GCRMA.fi)
 cor.vsnrma <- cor(VSNRMA.fi)
-corPlot(cor.rma, minCor = 0.7, labels = pData(affyData)[,1], title = "RMA")
-corPlot(cor.gcrma, minCor = 0.78, labels = pData(affyData)[,1], title = "GC-RMA")
-corPlot(cor.vsnrma, minCor = 0.78, labels = pData(affyData)[,1], title = "VSN-RMA")
+corPlot2(cor.rma, minCor = 0.7, labels = pData(affyData)[,1], title = "RMA")
+corPlot2(cor.gcrma, minCor = 0.78, labels = pData(affyData)[,1], title = "GC-RMA")
+corPlot2(cor.vsnrma, minCor = 0.78, labels = pData(affyData)[,1], title = "VSN-RMA")
 ```
 
 
@@ -243,7 +243,7 @@ Heatmap(selData, col = mycol, name = "log2-FC", show_row_names = FALSE,
         top_annotation = ha, show_column_names = TRUE,
         column_names_gp = gpar(fontsize = 8),
         clustering_distance_columns = "pearson",
-        show_row_dend = FALSE, km = 8,
+        show_row_dend = TRUE, 
         cluster_columns = TRUE, show_column_dend = TRUE,
         column_title = "Adj. p Value < 0.05 and |log2-FC| > 1",
         show_heatmap_legend = TRUE)
