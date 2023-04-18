@@ -59,3 +59,12 @@ if(!require("GO.db", quietly = TRUE))
 
 if(!require("simplifyEnrichment", quietly = TRUE))
   install("simplifyEnrichment", update = FALSE)
+
+if(!require("clusterProfiler", quietly = TRUE))
+  install("clusterProfiler", update = FALSE)
+
+if(!require("DOSE", quietly = TRUE))
+  install("DOSE", update = FALSE)
+
+if(!require("enrichplot", quietly = TRUE))
+  install("enrichplot", update = FALSE)
