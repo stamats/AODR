@@ -318,7 +318,7 @@ GO.sig.dn <- GeneID.PathID[GeneID.PathID$gene_id %in% entrez.sig.dn,]
 #sim.MF.up <- GO_similarity(GO.sig.up$go_id[GO.sig.up$Ontology == "MF"], ont = "MF")
 #sim.BP.dn <- GO_similarity(GO.sig.dn$go_id[GO.sig.dn$Ontology == "BP"], ont = "BP")
 #sim.CC.dn <- GO_similarity(GO.sig.dn$go_id[GO.sig.dn$Ontology == "CC"], ont = "CC")
-#sim.MF.dn <- GO_similarity(GO.sig.dn$go_id[GO.sig.dn$Ontology == "MF"], ont = "MF")
+sim.MF.dn <- GO_similarity(GO.sig.dn$go_id[GO.sig.dn$Ontology == "MF"], ont = "MF")
 
 ## very long computations
 #res.BP.up <- simplifyGO(sim.BP.up, column_title = "GO BP - FSHD up")
