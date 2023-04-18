@@ -316,7 +316,7 @@ GO.sig.dn <- GeneID.PathID[GeneID.PathID$gene_id %in% entrez.sig.dn,]
 #sim.BP.up <- GO_similarity(GO.sig.up$go_id[GO.sig.up$Ontology == "BP"], ont = "BP")
 #sim.CC.up <- GO_similarity(GO.sig.up$go_id[GO.sig.up$Ontology == "CC"], ont = "CC")
 #sim.MF.up <- GO_similarity(GO.sig.up$go_id[GO.sig.up$Ontology == "MF"], ont = "MF")
-sim.BP.dn <- GO_similarity(GO.sig.dn$go_id[GO.sig.dn$Ontology == "BP"], ont = "BP")
+#sim.BP.dn <- GO_similarity(GO.sig.dn$go_id[GO.sig.dn$Ontology == "BP"], ont = "BP")
 #sim.CC.dn <- GO_similarity(GO.sig.dn$go_id[GO.sig.dn$Ontology == "CC"], ont = "CC")
 #sim.MF.dn <- GO_similarity(GO.sig.dn$go_id[GO.sig.dn$Ontology == "MF"], ont = "MF")
 
@@ -324,9 +324,9 @@ sim.BP.dn <- GO_similarity(GO.sig.dn$go_id[GO.sig.dn$Ontology == "BP"], ont = "B
 #res.BP.up <- simplifyGO(sim.BP.up, column_title = "GO BP - FSHD up")
 #res.CC.up <- simplifyGO(sim.CC.up, column_title = "GO CC - FSHD up")
 #res.MF.up <- simplifyGO(sim.MF.up, column_title = "GO MF - FSHD up")
-res.BP.dn <- simplifyGO(sim.BP.dn, column_title = "GO BP - down")
+#res.BP.dn <- simplifyGO(sim.BP.dn, column_title = "GO BP - down")
 #res.CC.dn <- simplifyGO(sim.CC.dn, column_title = "GO CC - FSHD down")
-#res.MF.dn <- simplifyGO(sim.MF.dn, column_title = "GO MF - FSHD down")
+res.MF.dn <- simplifyGO(sim.MF.dn, column_title = "GO MF - FSHD down")
 ```
 
 
