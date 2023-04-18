@@ -321,12 +321,53 @@ GO.sig.dn <- GeneID.PathID[GeneID.PathID$gene_id %in% entrez.sig.dn,]
 sim.MF.dn <- GO_similarity(GO.sig.dn$go_id[GO.sig.dn$Ontology == "MF"], ont = "MF")
 
 ## very long computations
-#res.BP.up <- simplifyGO(sim.BP.up, column_title = "GO BP - FSHD up")
-#res.CC.up <- simplifyGO(sim.CC.up, column_title = "GO CC - FSHD up")
-#res.MF.up <- simplifyGO(sim.MF.up, column_title = "GO MF - FSHD up")
+#res.BP.up <- simplifyGO(sim.BP.up, column_title = "GO BP - up")
+#res.CC.up <- simplifyGO(sim.CC.up, column_title = "GO CC - up")
+#res.MF.up <- simplifyGO(sim.MF.up, column_title = "GO MF - up")
 #res.BP.dn <- simplifyGO(sim.BP.dn, column_title = "GO BP - down")
-#res.CC.dn <- simplifyGO(sim.CC.dn, column_title = "GO CC - FSHD down")
-res.MF.dn <- simplifyGO(sim.MF.dn, column_title = "GO MF - FSHD down")
+#res.CC.dn <- simplifyGO(sim.CC.dn, column_title = "GO CC - down")
+res.MF.dn <- simplifyGO(sim.MF.dn, column_title = "GO MF - down")
+```
+
+
+```{r}
+library(clusterProfiler)
+ego <- enrichGO(gene          = GO.sig.dn$gene_id,
+                universe      = entrez_list,
+                OrgDb         = org.Hs.eg.db,
+                ont           = "MF",
+                pAdjustMethod = "BH",
+                pvalueCutoff  = 0.2,
+                qvalueCutoff  = 0.2,
+                readable      = TRUE)
+head(ego)
+goplot(ego)
+```
+
+
+```{r}
+library(DOSE)
+edo <- enrichDGN(GO.sig.up$gene_id, 
+                 universe = entrez_list,
+                 pvalueCutoff = 0.2)
+library(enrichplot)
+barplot(edo)
+dotplot(edo)
+edox <- setReadable(edo, 'org.Hs.eg.db', 'ENTREZID')
+p1 <- cnetplot(edox, foldChange=GO.sig.up$gene_id)
+p1
+p2 <- cnetplot(edox, foldChange=GO.sig.up$gene_id, 
+               circular = TRUE, colorEdge = TRUE)
+p2
+p3 <- cnetplot(edox, node_label="category", cex_label_category = 1.2)
+p3
+p4 <- cnetplot(edox, node_label="gene", cex_label_gene = 0.8)
+p4
+p5 <- heatplot(edox)
+p5
+edox2 <- pairwise_termsim(edox)
+p6 <- treeplot(edox2)
+p6
 ```
 
 
