@@ -1,7 +1,7 @@
 ---
 title: "Affymetrix Workflow"
 author: "M. Kohl"
-date: "October 2022"
+date: "April 2023"
 output:
   rmarkdown::html_document:
     toc: true
@@ -117,7 +117,7 @@ boxplot(exprs(affyData.plier), range = 0, main = "PLIER")
 ```
 
 
-# Unspecific Filtering
+# (Unspecific) Filtering
 
 ```{r}
 library(genefilter)
@@ -211,7 +211,8 @@ colSums(t.pval.adj$adjp < 0.05)
 library(limma)
 library(MKomics)
 res <- mod.t.test(x = RMA.fi, group = group)
-colSums(res[,c(5,6)] < 0.05)
+mod.t.pval.adj <- mt.rawp2adjp(res$p.value)
+colSums(mod.t.pval.adj$adjp < 0.05)
 ```
 
 
@@ -252,6 +253,7 @@ Heatmap(selData, col = mycol, name = "log2-FC", show_row_names = FALSE,
 
 # Enrichment Analysis
 
+
 ```{r}
 library(org.Hs.eg.db)
 library(hgu133plus2.db)
@@ -283,6 +285,48 @@ kg <- kegga(list(Up = unique(GeneID.UP$ENTREZID),
             species = "Hs")
 topKEGG(kg, sort = "up")
 topKEGG(kg, sort = "down")
+```
+
+
+```{r}
+library(simplifyEnrichment)
+library(GO.db)
+library(org.Hs.eg.db)
+egGO2ALLEGS <- getFromNamespace("org.Hs.egGO2ALLEGS", "org.Hs.eg.db")
+entrez_list <- unique(GeneID$ENTREZID)
+entrez_list <- entrez_list[order(as.numeric(entrez_list))]
+entrez_list <- entrez_list[!is.na(entrez_list)]
+
+AnnotationDbi::Lkeys(egGO2ALLEGS) <- entrez_list
+GeneID.PathID <- AnnotationDbi::toTable(egGO2ALLEGS)[, c("gene_id", "go_id", "Ontology")]
+d <- duplicated(GeneID.PathID[, c("gene_id", "go_id")])
+GeneID.PathID <- GeneID.PathID[!d, ]
+
+entrez.sig.up <- unique(GeneID.UP$ENTREZID)
+entrez.sig.up <- entrez.sig.up[order(as.numeric(entrez.sig.up))]
+entrez.sig.up <- entrez.sig.up[!is.na(entrez.sig.up)]
+GO.sig.up <- GeneID.PathID[GeneID.PathID$gene_id %in% entrez.sig.up,]
+
+entrez.sig.dn <- unique(GeneID.DN$ENTREZID)
+entrez.sig.dn <- entrez.sig.dn[order(as.numeric(entrez.sig.dn))]
+entrez.sig.dn <- entrez.sig.dn[!is.na(entrez.sig.dn)]
+GO.sig.dn <- GeneID.PathID[GeneID.PathID$gene_id %in% entrez.sig.dn,]
+
+## very long computations
+#sim.BP.up <- GO_similarity(GO.sig.up$go_id[GO.sig.up$Ontology == "BP"], ont = "BP")
+#sim.CC.up <- GO_similarity(GO.sig.up$go_id[GO.sig.up$Ontology == "CC"], ont = "CC")
+#sim.MF.up <- GO_similarity(GO.sig.up$go_id[GO.sig.up$Ontology == "MF"], ont = "MF")
+sim.BP.dn <- GO_similarity(GO.sig.dn$go_id[GO.sig.dn$Ontology == "BP"], ont = "BP")
+#sim.CC.dn <- GO_similarity(GO.sig.dn$go_id[GO.sig.dn$Ontology == "CC"], ont = "CC")
+#sim.MF.dn <- GO_similarity(GO.sig.dn$go_id[GO.sig.dn$Ontology == "MF"], ont = "MF")
+
+## very long computations
+#res.BP.up <- simplifyGO(sim.BP.up, column_title = "GO BP - FSHD up")
+#res.CC.up <- simplifyGO(sim.CC.up, column_title = "GO CC - FSHD up")
+#res.MF.up <- simplifyGO(sim.MF.up, column_title = "GO MF - FSHD up")
+res.BP.dn <- simplifyGO(sim.BP.dn, column_title = "GO BP - down")
+#res.CC.dn <- simplifyGO(sim.CC.dn, column_title = "GO CC - FSHD down")
+#res.MF.dn <- simplifyGO(sim.MF.dn, column_title = "GO MF - FSHD down")
 ```
 
 

@@ -56,3 +56,6 @@ if(!require("hgu133plus2.db", quietly = TRUE))
 
 if(!require("GO.db", quietly = TRUE))
   install("GO.db", update = FALSE)
+
+if(!require("simplifyEnrichment", quietly = TRUE))
+  install("simplifyEnrichment", update = FALSE)
