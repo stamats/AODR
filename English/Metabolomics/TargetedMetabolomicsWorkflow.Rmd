@@ -16,7 +16,6 @@ knitr::opts_chunk$set(echo = TRUE, error = TRUE)
 
 # Introduction
 
-Beschreibung des Experimentes, des Datensatzes, der Hypothesen, etc.
 
 # Import of Data
 
@@ -151,8 +150,7 @@ corPlot(Cor, minCor = 0.95, cex.axis = 0.75, title = "Pearson correlation",
 res <- mod.t.test(t(normData), group = group)
 ```
 
-Das folgende Histogramm der p-Werte der paarweisen Vergleiche weist darauf hin, dass wir mit
-einigen signifikanten Unterschieden zwischen den Gruppen rechnen können.
+
 ```{r}
 hist(res$p.value, freq = TRUE, breaks = 100,
      main = "Diagnostic Plot: Distribution of p values",
