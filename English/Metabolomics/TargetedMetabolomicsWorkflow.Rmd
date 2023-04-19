@@ -159,19 +159,11 @@ hist(res$p.value, freq = TRUE, breaks = 100,
 
 
 ```{r}
-library(ggplot2)
-farbe <- factor(as.integer(res$adj.p.value < 0.05 & 
-                           abs(res$`difference in means`) > 1))
-ps <- data.frame(pvals = res$adj.p.value, 
-                 logfc = res$`difference in means`,
-                 farbe = farbe)
-ggplot(ps, aes(x = logfc, y = pvals, color = farbe)) + 
-  geom_point() +
-  geom_hline(yintercept = 0.05) + scale_y_neglog10() +
-  geom_vline(xintercept = c(-1, 1)) + 
-  scale_color_manual(values = c("black", "red")) +
-  xlab("log-fold change") + ylab("-log10(adj. p value)") + 
-  ggtitle("Volcano Plot")
+library(MKinfer)
+volcano(res$`difference in means`, pval = res$adj.p.value, 
+        effect0 = 0, effect.low = -1, effect.high = 1, 
+        alpha = 0.25, xlab = "log2-fold Change (log2-FC)",
+        ylab = expression(paste(-log[10], "(adj. p Value)")))
 ```
 
 
