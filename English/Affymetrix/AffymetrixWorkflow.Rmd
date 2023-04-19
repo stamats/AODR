@@ -1,5 +1,5 @@
 ---
-title: "Affymetrix Mikroarray Workflow"
+title: "Affymetrix Microarray Workflow"
 author: "M. Kohl"
 date: "April 2023"
 output:
