@@ -190,11 +190,21 @@ colSums(mt.rawp2adjp(res.paired$p.value)$adjp < 0.05)
 
 
 ```{r}
+hist(res.paired$p.value, breaks = seq(from = 0, to = 1, by = 0.01))
+```
+
+
+```{r}
 tfun.paired <- function(x, g){
   t.test(x ~ g, paired = TRUE)$p.value
 }
 res.t.paired <- apply(exprs(Ilu.rsn.det), 1, tfun.paired, g = group)
 colSums(mt.rawp2adjp(res.t.paired)$adjp < 0.05)
+```
+
+
+```{r}
+hist(res.t.paired, breaks = seq(from = 0, to = 1, by = 0.01))
 ```
 
 
